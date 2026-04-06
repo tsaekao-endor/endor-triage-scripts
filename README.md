@@ -53,10 +53,10 @@ If your CI runner is not GitHub Actions, none of the GitHub-specific environment
 
 ```bash
 export ENDOR_NAMESPACE=your-namespace        # same value you pass to endorctl scan
-export ENDOR_API_KEY=your-endor-api-key      # Endor Labs auth (instead of OIDC)
-export GH_TOKEN=your-github-pat              # GitHub PAT with pull-requests:write
-export REPO=owner/repo                       # GitHub repository
-export PR_NUMBER=123                         # pull request number
+export ENDOR_API_KEY=your-endor-api-key      # Endor Labs auth
+export GH_TOKEN=github-pat                   # GitHub PAT with pull-requests:write
+export REPO=org/repo                         # GitHub repository
+export PR_NUMBER=xyz                         # pull request number
 ```
 
 **`handle_triage_command.py`**
@@ -65,8 +65,8 @@ export PR_NUMBER=123                         # pull request number
 export ENDOR_NAMESPACE=your-namespace
 export ENDOR_API_KEY=your-endor-api-key
 export GH_TOKEN=your-github-pat              # GitHub PAT with pull-requests:write and contents:write
-export REPO=owner/repo
-export PR_NUMBER=123
+export REPO=org/repo
+export PR_NUMBER=xyz
 export COMMENTER=github-username             # GitHub username of whoever posted the comment
 export COMMENT_BODY="$WEBHOOK_COMMENT_BODY"  # the full text of the PR comment, extracted from
                                              # the GitHub issue_comment webhook payload
