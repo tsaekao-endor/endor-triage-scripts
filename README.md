@@ -27,12 +27,21 @@ The scripts live in your repo. No runtime downloads, no external dependencies.
 Wherever you run `endorctl scan`, add one line after it:
 
 ```bash
-endorctl scan --pr --namespace=$ENDOR_NAMESPACE ...
+endorctl scan \
+  --pr \
+  --pr-incremental \
+  --enable-pr-comments \
+  --namespace=$ENDOR_NAMESPACE
 
 python3 .endor/post_triage_comment.py
 ```
 
 That's the entire change to your scan pipeline.
+
+> **Note:** `--enable-pr-comments` already posts Endor Labs' native findings comment.
+> `post_triage_comment.py` posts a second, separate comment with a numbered table
+> that developers can reply to with `/endor fp` or `/endor accept-risk` commands.
+> Both comments appear on the PR and serve different purposes.
 
 ### Step 3 — Add a triage handler
 
