@@ -64,6 +64,7 @@ jobs:
       - name: Endor Labs scan and post triage comment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENDOR_NAMESPACE: ${{ vars.ENDOR_NAMESPACE }}
         run: |
           endorctl scan \
             --enable-github-action-token \
