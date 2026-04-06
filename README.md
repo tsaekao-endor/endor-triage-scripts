@@ -67,8 +67,12 @@ export ENDOR_API_KEY=your-endor-api-key
 export GH_TOKEN=your-github-pat              # GitHub PAT with pull-requests:write and contents:write
 export REPO=owner/repo
 export PR_NUMBER=123
-export COMMENT_BODY="/endor fp 1,2"          # full text of the triggering PR comment
 export COMMENTER=github-username             # GitHub username of whoever posted the comment
+export COMMENT_BODY="$WEBHOOK_COMMENT_BODY"  # the full text of the PR comment, extracted from
+                                             # the GitHub issue_comment webhook payload
+                                             # (e.g. "/endor fp 1,2" or "/endor accept-risk 3")
 ```
+
+`COMMENT_BODY` is whatever the developer actually typed in the PR. Your webhook listener receives this in the GitHub `issue_comment` event payload at `comment.body` and passes it through to the script.
 
 You will also need to install the `gh` CLI on your runner and ensure `git` is configured with credentials to push to the repository.
