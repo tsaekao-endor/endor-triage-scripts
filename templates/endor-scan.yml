@@ -62,13 +62,14 @@ jobs:
 
       - name: Endor Labs scan and post triage comment
         env:
-          ENDOR_NAMESPACE: ${{ vars.ENDOR_NAMESPACE }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           endorctl scan \
             --pr \
             --pr-incremental \
             --enable-pr-comments \
-            --namespace=$ENDOR_NAMESPACE
+            --scm-token=${{ secrets.GITHUB_TOKEN }} \
+            --scm-pr-id=${{ github.event.pull_request.number }} \
+            --namespace=${{ vars.ENDOR_NAMESPACE }}
 
           python3 scripts/post_triage_comment.py

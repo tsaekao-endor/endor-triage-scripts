@@ -21,6 +21,8 @@ endorctl scan \
   --pr \
   --pr-incremental \
   --enable-pr-comments \
+  --scm-token=$GH_TOKEN \
+  --scm-pr-id=$PR_NUMBER \
   --namespace=$ENDOR_NAMESPACE
 
 python3 scripts/post_triage_comment.py
