@@ -30,6 +30,8 @@ python3 handle_triage_command.py
 
 This creates the corresponding ignore entries in `.endorignore.yaml`, commits them to the PR branch, and replies with a confirmation.
 
+> **Important:** `handle_triage_command.py` does not run automatically. It needs a trigger — something that watches for PR comments and calls the script when an `/endor` command is detected. In GitHub Actions, this means adding a separate workflow file to your repo that listens for `issue_comment` events. A ready-to-use template is available at [endor-pr-triage/templates/endor-triage.yml](https://github.com/tsaekao-endor/endor-pr-triage/blob/main/templates/endor-triage.yml) — copy it into `.github/workflows/` and you're set.
+
 ---
 
 ## Environment variables
