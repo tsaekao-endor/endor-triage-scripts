@@ -36,11 +36,39 @@ This creates the corresponding ignore entries in `.endorignore.yaml`, commits th
 
 ## Environment variables
 
-Both scripts auto-detect as much as possible from the environment. The only variables you need to set explicitly are:
+### GitHub Actions
+
+When running in GitHub Actions, the scripts auto-detect everything from the environment. The only variables you need to set explicitly are:
 
 | Variable | Script | Notes |
 |----------|--------|-------|
-| `GH_TOKEN` | both | GitHub token with `pull-requests:write` and `contents:write`. In GitHub Actions, use `${{ secrets.GITHUB_TOKEN }}`. |
-| `COMMENT_BODY` | `handle_triage_command.py` only | The text of the `/endor` comment. In GitHub Actions, use `${{ github.event.comment.body }}`. |
+| `GH_TOKEN` | both | GitHub token to post PR comments. Use `${{ secrets.GITHUB_TOKEN }}`. |
+| `COMMENT_BODY` | `handle_triage_command.py` only | The text of the `/endor` comment. Use `${{ github.event.comment.body }}`. |
 
-Everything else (`ENDOR_NAMESPACE`, `REPO`, `PR_NUMBER`, `COMMENTER`) is picked up automatically from the environment when running in GitHub Actions. Set them explicitly if you're running in a different CI system.
+### Non-GitHub Actions CI (Jenkins, GitLab CI, CircleCI, homegrown, etc.)
+
+If your CI runner is not GitHub Actions, none of the GitHub-specific environment variables are present. You must set all of the following before calling the scripts:
+
+**`post_triage_comment.py`**
+
+```bash
+export ENDOR_NAMESPACE=your-namespace        # same value you pass to endorctl scan
+export ENDOR_API_KEY=your-endor-api-key      # Endor Labs auth (instead of OIDC)
+export GH_TOKEN=your-github-pat              # GitHub PAT with pull-requests:write
+export REPO=owner/repo                       # GitHub repository
+export PR_NUMBER=123                         # pull request number
+```
+
+**`handle_triage_command.py`**
+
+```bash
+export ENDOR_NAMESPACE=your-namespace
+export ENDOR_API_KEY=your-endor-api-key
+export GH_TOKEN=your-github-pat              # GitHub PAT with pull-requests:write and contents:write
+export REPO=owner/repo
+export PR_NUMBER=123
+export COMMENT_BODY="/endor fp 1,2"          # full text of the triggering PR comment
+export COMMENTER=github-username             # GitHub username of whoever posted the comment
+```
+
+You will also need to install the `gh` CLI on your runner and ensure `git` is configured with credentials to push to the repository.
