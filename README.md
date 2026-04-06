@@ -1,25 +1,14 @@
 # Endor Labs Triage Scripts
 
-Two Python scripts that add interactive, comment-driven triage to any CI pipeline running [Endor Labs](https://www.endorlabs.com) PR scans.
-
-After a scan runs, `post_triage_comment.py` posts a numbered findings table to the PR. When a developer replies with `/endor fp 1,2`, `handle_triage_command.py` creates the corresponding ignore entries, commits them to the PR branch, and replies with a confirmation.
+Two Python scripts that bolt onto your existing Endor Labs PR scan to add interactive, comment-driven finding triage.
 
 ---
 
-## Scripts
+## How to use them
 
-| Script | Run it... | What it does |
-|--------|-----------|--------------|
-| [`post_triage_comment.py`](post_triage_comment.py) | After your Endor Labs scan step | Posts a numbered findings table to the PR. Skips silently if there are no CI-blocking or CI-warning findings. |
-| [`handle_triage_command.py`](handle_triage_command.py) | When a PR comment containing `/endor` is detected | Parses the command, creates `.endorignore.yaml` entries, commits them, and replies with a summary. |
+### Step 1 — Download the scripts
 
----
-
-## Setup
-
-### 1. Download the scripts into your repository
-
-Copy both scripts into your repo — a `.endor/` folder at the root works well:
+Run this once and commit the result:
 
 ```bash
 mkdir -p .endor
@@ -31,92 +20,61 @@ curl -fsSL https://raw.githubusercontent.com/tsaekao-endor/endor-triage-scripts/
   -o .endor/handle_triage_command.py
 ```
 
-Commit them. They live in your repo going forward — no runtime downloads, no external dependencies.
+The scripts live in your repo. No runtime downloads, no external dependencies.
 
-### 2. Add the triage comment step to your scan workflow
+### Step 2 — Append to your scan step
 
-After your existing `endorlabs/github-action` scan step, add:
+Wherever you run `endorctl scan`, add one line after it:
 
-```yaml
-- name: Post Endor Labs triage comment
-  if: always()
-  env:
-    ENDOR_NAMESPACE: ${{ vars.ENDOR_NAMESPACE }}
-  run: python3 .endor/post_triage_comment.py
+```bash
+endorctl scan --pr --namespace=$ENDOR_NAMESPACE ...
+
+python3 .endor/post_triage_comment.py
 ```
 
-That's it. `GITHUB_TOKEN`, the PR number, and the repository name are all picked up automatically from the GitHub Actions environment — no extra variables needed.
+That's the entire change to your scan pipeline.
 
-### 3. Add the triage handler workflow
+### Step 3 — Add a triage handler
 
-Create `.github/workflows/endor-triage.yml`:
+Create a separate job (or pipeline) that fires when a PR comment containing `/endor` is detected, checks out the PR branch, and runs:
 
-```yaml
-name: Endor Labs Triage Handler
-on:
-  issue_comment:
-    types: [created]
-
-jobs:
-  triage:
-    if: |
-      github.event.issue.pull_request != null &&
-      (contains(github.event.comment.body, '/endor fp') ||
-       contains(github.event.comment.body, '/endor accept-risk'))
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-      contents: write
-      id-token: write
-
-    steps:
-      - name: Get PR branch
-        id: pr
-        run: |
-          PR_DATA=$(gh pr view ${{ github.event.issue.number }} \
-            --repo ${{ github.repository }} --json headRefName)
-          echo "branch=$(echo $PR_DATA | jq -r .headRefName)" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.pr.outputs.branch }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-
-      - name: Install endorctl
-        run: |
-          curl -fsSL https://api.endorlabs.com/download/latest/endorctl_linux_amd64 \
-            -o endorctl && chmod +x endorctl && sudo mv endorctl /usr/local/bin/endorctl
-
-      - name: Handle triage command
-        env:
-          ENDOR_NAMESPACE: ${{ vars.ENDOR_NAMESPACE }}
-        run: python3 .endor/handle_triage_command.py
+```bash
+python3 .endor/handle_triage_command.py
 ```
 
-Again, everything else — the PR number, comment body, commenter identity, and GitHub token — is read automatically from the GitHub Actions event payload. The only variable you configure is `ENDOR_NAMESPACE`.
+See [Triage handler setup](#triage-handler-setup) below for CI-specific examples.
 
-### 4. Set `ENDOR_NAMESPACE`
+---
 
-Go to **Settings → Secrets and variables → Actions → Variables** and add:
+## What you need beyond the scan step
 
-| Variable | Value |
-|----------|-------|
-| `ENDOR_NAMESPACE` | Your Endor Labs tenant namespace (e.g. `my-company`) |
+When you run `endorctl scan`, you've already configured:
+- ✅ `ENDOR_NAMESPACE` — used by both scripts automatically
+- ✅ `endorctl` on PATH — already installed
+- ✅ Endor Labs authentication — already set up
 
-This is the same namespace you already pass to the Endor Labs scan step — not new configuration.
+The **only new requirement** is a GitHub token so the scripts can post PR comments:
+
+```bash
+export GH_TOKEN=<github-token>   # needs: repo scope (or pull-requests:write + contents:write)
+```
+
+| CI system | How to provide it |
+|-----------|------------------|
+| GitHub Actions | `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}` — already available, no new secret needed |
+| Jenkins / GitLab CI / CircleCI | Add a GitHub PAT as a CI secret and pass it as `GH_TOKEN` |
+
+Everything else — the PR number, repository name, commenter identity, and comment body — is auto-detected from the environment. See [Environment variable reference](#environment-variable-reference) if you need to override anything.
 
 ---
 
 ## Triage commands
 
-Once the findings table is posted, developers reply in the PR:
+Once `post_triage_comment.py` posts the findings table, developers reply in the PR:
 
 ```
-/endor fp 1
-/endor accept-risk 2,3
+/endor fp 1,2
+/endor accept-risk 3
 /endor fp 1 --comment="Not reachable in prod" --expires=2026-12-31 --expire-if-fix
 ```
 
@@ -135,52 +93,126 @@ Once the findings table is posted, developers reply in the PR:
 
 ---
 
-## Authentication
+## Triage handler setup
 
-### GitHub Actions (recommended)
+The triage handler needs to run when a PR comment containing `/endor` is posted. It must check out the PR branch (so it can commit `.endorignore.yaml`) before calling the script.
 
-No extra setup. The scripts automatically use GitHub Actions OIDC keyless authentication when `GITHUB_ACTIONS=true`. Requires `id-token: write` permission on the job.
+### GitHub Actions
 
-### Other CI systems
+```yaml
+# .github/workflows/endor-triage.yml
+name: Endor Labs Triage Handler
+on:
+  issue_comment:
+    types: [created]
 
-Set one of the following as a CI secret:
+jobs:
+  triage:
+    if: |
+      github.event.issue.pull_request != null &&
+      (contains(github.event.comment.body, '/endor fp') ||
+       contains(github.event.comment.body, '/endor accept-risk'))
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+      id-token: write   # keyless Endor Labs auth
 
-```bash
-ENDOR_API_KEY=<your-api-key>
-# or
-ENDOR_KEYID=<key-id>
-ENDOR_PRIVATE_KEY=<private-key>
+    steps:
+      - name: Get PR branch
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch=$(gh pr view ${{ github.event.issue.number }} \
+            --repo ${{ github.repository }} --json headRefName -q .headRefName)
+          echo "branch=$branch" >> $GITHUB_OUTPUT
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Install endorctl
+        run: |
+          curl -fsSL https://api.endorlabs.com/download/latest/endorctl_linux_amd64 \
+            -o endorctl && chmod +x endorctl && sudo mv endorctl /usr/local/bin/endorctl
+
+      - name: Handle triage command
+        env:
+          ENDOR_NAMESPACE: ${{ vars.ENDOR_NAMESPACE }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .endor/handle_triage_command.py
 ```
 
-For other CI systems you will also need to set `REPO` (`owner/repo`), `PR_NUMBER`, and for the triage handler: `COMMENT_BODY` and `COMMENTER`, since these are not automatically available outside of GitHub Actions.
+### Jenkins
+
+```groovy
+// Triggered by a GitHub webhook on issue_comment events
+pipeline {
+  agent any
+  steps {
+    // check out the PR branch first, then:
+    sh '''
+      ENDOR_NAMESPACE=your-namespace \
+      ENDOR_API_KEY=$ENDOR_API_KEY \
+      GH_TOKEN=$GITHUB_TOKEN \
+      PR_NUMBER=$PR_NUMBER \
+      REPO=your-org/your-repo \
+      COMMENT_BODY="$COMMENT_BODY" \
+      COMMENTER=$COMMENTER \
+      python3 .endor/handle_triage_command.py
+    '''
+  }
+}
+```
+
+### GitLab CI / CircleCI
+
+Same pattern: check out the PR branch, set the environment variables listed in the reference below, then call `python3 .endor/handle_triage_command.py`.
 
 ---
 
-## How it works
+## Environment variable reference
 
-```
-PR opened → scan runs
-└── endorctl scan --pr                  your existing scan step
-└── post_triage_comment.py              queries Endor Labs API for findings
-    ├── auto-detects repo, PR#, token   from GitHub Actions environment
-    ├── auto-detects project UUID       from repo name via Endor API
-    └── posts numbered findings table   with hidden UUID map in comment
+Most values are auto-detected. Only override what you need to.
 
-Developer replies: /endor fp 1,2
+### `post_triage_comment.py`
 
-issue_comment webhook → handle_triage_command.py
-    ├── reads PR#, comment, commenter   from GitHub Actions event payload
-    ├── looks up finding UUIDs          from the hidden map in the triage comment
-    ├── runs endorctl ignore            for each finding
-    ├── commits .endorignore.yaml       to the PR branch
-    └── replies with confirmation
-```
+| Variable | Required | Default | Notes |
+|----------|----------|---------|-------|
+| `ENDOR_NAMESPACE` | **Yes** | — | Already set for your scan step |
+| `GH_TOKEN` | **Yes** | `GITHUB_TOKEN` | Auto-used in GitHub Actions; set as a secret elsewhere |
+| `REPO` | No | `GITHUB_REPOSITORY` | `owner/repo` — auto-detected in GitHub Actions |
+| `PR_NUMBER` | No | from event payload / `GITHUB_REF` | Auto-detected in GitHub Actions |
+| `ENDOR_PROJECT_UUID` | No | auto-detected from repo name | Set explicitly to skip the API lookup |
+
+### `handle_triage_command.py`
+
+| Variable | Required | Default | Notes |
+|----------|----------|---------|-------|
+| `ENDOR_NAMESPACE` | **Yes** | — | Already set for your scan step |
+| `GH_TOKEN` | **Yes** | `GITHUB_TOKEN` | Auto-used in GitHub Actions; set as a secret elsewhere |
+| `REPO` | No | `GITHUB_REPOSITORY` | Auto-detected in GitHub Actions |
+| `PR_NUMBER` | No | from event payload | Auto-detected in GitHub Actions |
+| `COMMENT_BODY` | No | from event payload | Auto-detected in GitHub Actions; set explicitly elsewhere |
+| `COMMENTER` | No | `GITHUB_ACTOR` / event payload | Auto-detected in GitHub Actions |
+
+---
+
+## Authentication against Endor Labs
+
+| Environment | How it works |
+|-------------|-------------|
+| GitHub Actions | Keyless OIDC — automatic when `GITHUB_ACTIONS=true`. Requires `id-token: write` on the job. No secrets needed. |
+| Other CI | Set `ENDOR_API_KEY` **or** `ENDOR_KEYID` + `ENDOR_PRIVATE_KEY` as CI secrets. `endorctl` picks these up automatically. |
 
 ---
 
 ## Requirements
 
 - Python 3.10+
-- [`endorctl`](https://docs.endorlabs.com/getting-started/install/) on PATH
-- [`gh` CLI](https://cli.github.com/) on PATH, authenticated via `GITHUB_TOKEN`
+- `endorctl` on PATH (already installed for your scan step)
+- `gh` CLI on PATH (`apt install gh` or [install docs](https://github.com/cli/cli#installation))
 - `git` configured on the runner (for `handle_triage_command.py`)
