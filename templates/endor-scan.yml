@@ -32,9 +32,10 @@ jobs:
             -o endorctl && chmod +x endorctl && sudo mv endorctl /usr/local/bin/endorctl
 
       - name: Endor Labs scan
-        env:
-          ENDOR_NAMESPACE: ${{ vars.ENDOR_NAMESPACE }}
-        run: endorctl scan --namespace=$ENDOR_NAMESPACE
+        run: |
+          endorctl scan \
+            --enable-github-action-token \
+            --namespace=${{ vars.ENDOR_NAMESPACE }}
 
   # ── PR scan with interactive triage comment ────────────────────────────────
   # Runs on pull requests. Posts an interactive findings table that developers
@@ -65,6 +66,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           endorctl scan \
+            --enable-github-action-token \
             --pr \
             --pr-incremental \
             --enable-pr-comments \

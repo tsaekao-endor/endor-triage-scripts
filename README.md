@@ -18,6 +18,7 @@ Call `post_triage_comment.py` right after your `endorctl scan` command:
 
 ```bash
 endorctl scan \
+  --enable-github-action-token \
   --pr \
   --pr-incremental \
   --enable-pr-comments \
