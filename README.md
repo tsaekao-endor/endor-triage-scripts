@@ -31,7 +31,11 @@ python3 scripts/post_triage_comment.py
 
 ### 3. Add the triage handler
 
-Copy [`templates/endor-triage.yml`](templates/endor-triage.yml) into `.github/workflows/` in your repo. This is what listens for `/endor` PR comments and calls `handle_triage_command.py` automatically.
+`handle_triage_command.py` needs something to trigger it when a developer posts an `/endor` comment. How you set that up depends on your CI system:
+
+**GitHub Actions:** Copy [`templates/endor-triage.yml`](templates/endor-triage.yml) into `.github/workflows/` in your repo. It listens for `issue_comment` webhook events and calls `handle_triage_command.py` automatically — no extra infrastructure needed.
+
+**Other CI systems (Jenkins, GitLab CI, CircleCI, etc.):** You will need to build your own webhook listener or event bridge that receives GitHub `issue_comment` events and triggers a CI job. That job should check out the PR branch and call `python3 scripts/handle_triage_command.py` with the environment variables listed in the reference below.
 
 A sample end-to-end scan workflow is also available at [`templates/endor-scan.yml`](templates/endor-scan.yml).
 
