@@ -2,6 +2,10 @@ name: Endor Labs Triage Handler
 
 # Triggers whenever a comment is created on a pull request.
 # Only runs when the comment contains a /endor command.
+# This example is for GitHub actions, and you may need to build a webhook listener on your side if you use a different CI tool. You will need something that:
+  # 1. Receives the GitHub issue_comment webhook from your repo
+  # 2. Checks whether the comment body contains /endor fp or /endor accept-risk
+  # 3. If yes, trigger a job that will check out the PR branch and runs the handle_triage_command.py script with the comment payload
 on:
   issue_comment:
     types: [created]
